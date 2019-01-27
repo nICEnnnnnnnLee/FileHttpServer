@@ -33,10 +33,11 @@ public class SocketDealer implements Runnable {
 	final static char[] WHITE_SPACE = "                                                ".toCharArray();
 	Socket socketClient;
 	File srcFolder;
-
-	public SocketDealer(Socket socketClient, String source) {
+	SocketMonitor monitor;
+	public SocketDealer(Socket socketClient, SocketMonitor monitor, String source) {
 		this.socketClient = socketClient;
 		this.srcFolder = new File(source);
+		this.monitor = monitor;
 	}
 
 	@Override
@@ -88,6 +89,8 @@ public class SocketDealer implements Runnable {
 	 * @throws IOException
 	 */
 	private HttpRequest getHttpRequestStructrue(BufferedReader reader) throws IOException, IndexOutOfBoundsException {
+		//refresh the monitor
+		monitor.put(socketClient);
 		//System.out.println("Headers 提取中... 可能会阻塞或抛出异常...");
 		HttpRequest httpRequest = new HttpRequest();
 		// 第一行
@@ -123,6 +126,9 @@ public class SocketDealer implements Runnable {
 			reader.read(httpRequest.data);
 		}
 		// System.out.println("获取httpRequest完毕...");
+		
+		//内容传输不计入时间, 则从监控队列删除
+		//monitor.remove(socketClient);
 		return httpRequest;
 	}
 
@@ -330,7 +336,7 @@ public class SocketDealer implements Runnable {
 		out.write(head);
 		out.write(BREAK_LINE);
 		
-		System.out.println("当前url 为: " +httpRequest.url);
+		//System.out.println("当前url 为: " +httpRequest.url);
 		byte[] title = String.format("<h1>Index Of %s</h1><hr><pre>", httpRequest.url).getBytes();
 		out.write(String.format("%x", title.length).getBytes());
 		out.write(BREAK_LINE);

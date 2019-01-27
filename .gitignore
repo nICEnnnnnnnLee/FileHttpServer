@@ -7,3 +7,4 @@
 *.config
 /bin
 /target
+/src/nicelee/http/sample

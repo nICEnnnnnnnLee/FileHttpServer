@@ -11,11 +11,12 @@
 ## 配置
 配置从同级目录下的```app.config```中加载。
 
-| 属性  | 值 |
-| ------------- | ------------- |
-| nicelee.server.port  | 服务器监听端口  |
-| nicelee.server.fixedPoolSize  |目前使用fixedThreadPool管理Socket处理线程，可以看作是最大TCP并发连接数  |
-| nicelee.server.source  | 目的文件目录 |
+| 属性  | 值 | 默认值 |
+| ------------- | ------------- |------------- |
+| nicelee.server.port  | 服务器监听端口  | 7777  |
+| nicelee.server.fixedPoolSize  |目前使用fixedThreadPool管理Socket处理线程，可以看作是最大TCP并发连接数  | 30  |
+| nicelee.server.source  | 目的文件目录 | .  |
+| nicelee.server.socketTimeout  | 最大socket连接时长，单位ms(针对TCP端口被长连接长时间占用) | 120000  |
 
 
 示例如下：  
@@ -46,7 +47,28 @@
 * **GitHub**: [https://github.com/nICEnnnnnnnLee/FileHttpServer](https://github.com/nICEnnnnnnnLee/FileHttpServer)  
 * **Gitee码云**: [https://gitee.com/NiceLeee/FileHttpServer](https://gitee.com/NiceLeee/FileHttpServer)  
 * **LICENSE**: [Apache License v2.0](https://www.apache.org/licenses/LICENSE-2.0.html)
+* 关于可能的中文乱码问题
+可以设置file.encoding=utf-8。  
+该JVM设置在启动前已经读取，代码里面再修改无效。  
+一个解决办法是修改注册表：   
 
+
+| 属性  | 值 |
+| ------------- | ------------- |
+| 位置  | HKEY_CLASSES_ROOT\Applications\javaw.exe\shell\open\command  |
+| 原始值  |"...\bin\javaw.exe" -jar "%1"  |
+| 现有值  | "...\bin\javaw.exe" -Dfile.encoding=utf-8 -jar "%1"  |
+
+
+## 更新日志
+* v1.1(当前版本，尚未Release):
+    * 改变配置的默认读取方式，方便拓展
+    * 增加监控进程，关闭长时间连接的Socket连接（支持两种计算方式，可以区分报头和内容传输时间）
+* v1.0:
+    * 参照Http协议进行实现，
+    * 支持Http Basic授权认证（Demo级实现，账户名admin/密码admin，不保证安全）
+    * 支持Http Chunked传输方式
+    * 支持文件断点续传（流媒体拖拽播放也是可以的哦~(๑•̀ㅂ•́)و✧）
 
 
 
