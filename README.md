@@ -16,27 +16,29 @@
 | nicelee.server.port  | 服务器监听端口  |
 | nicelee.server.fixedPoolSize  |目前使用fixedThreadPool管理Socket处理线程，可以看作是最大TCP并发连接数  |
 | nicelee.server.source  | 目的文件目录 |
+
+
 示例如下： 
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/config.png)  
 
 ## 预览
-* 访问路径
+* 访问路径  
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/preview.png)  
 
-* ```/source```目录下需要授权（Demo，可以是其它逻辑）
+* ```/source```目录下需要授权（Demo，可以是其它逻辑）  
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/preview-auth.png)  
 
-* 认证失败
+* 认证失败  
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/preview-401.png)  
 
-* 认证成功
+* 认证成功  
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/preview-auth_ok.png)  
 
-* 禁止读取.txt文件（Demo，可以是其它逻辑）
+* 禁止读取.txt文件（Demo，可以是其它逻辑）  
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/preview-403.png)  
 
-## 注意
-* 该作品为http协议的学习实现，作者不对程序的安全性、可靠性做任何保证！  
+## 注意  
+* 该作品为http协议的学习实现，作者不对程序的安全性做任何保证！  
 
 ## 其它  
 * **下载地址**: [https://github.com/nICEnnnnnnnLee/FileHttpServer/releases](https://github.com/nICEnnnnnnnLee/FileHttpServer/releases)
