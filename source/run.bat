@@ -1,1 +1,1 @@
-java -jar FileHttpServer.jar
+java -Dfile.encoding=utf-8 -jar FileHttpServer.jar
