@@ -18,7 +18,8 @@
 | nicelee.server.source  | 目的文件目录 |
 
 
-示例如下： 
+示例如下：  
+
 ![](https://raw.githubusercontent.com/nICEnnnnnnnLee/FileHttpServer/master/source/config.png)  
 
 ## 预览
