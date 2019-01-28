@@ -7,7 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.Socket;
-import java.nio.ByteBuffer;
+import java.net.SocketException;
 import java.text.SimpleDateFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,29 +36,31 @@ public class SocketDealer implements Runnable {
 	Socket socketClient;
 	File srcFolder;
 	SocketMonitor monitor;
+	StreamReader in;
 
-	StreamReader streamReader = new StreamReader();
-	ByteBuffer byteBuffer = ByteBuffer.allocate(2560);
 
 	public SocketDealer(Socket socketClient, SocketMonitor monitor, String source) {
 		this.socketClient = socketClient;
 		this.srcFolder = new File(source);
 		this.monitor = monitor;
+		
 	}
 
 	@Override
 	public void run() {
-		BufferedInputStream in = null;
+		//BufferedInputStream in = null;
 		BufferedOutputStream out = null;
 		String url = "";
 		try {
-			in = new BufferedInputStream(socketClient.getInputStream());
+//			in = new BufferedInputStream(socketClient.getInputStream());
+			in = new StreamReader(monitor, socketClient, new BufferedInputStream(socketClient.getInputStream()));
 			out = new BufferedOutputStream(socketClient.getOutputStream());
 			// writer = new BufferedWriter(new
 			// OutputStreamWriter(socketClient.getOutputStream()));
 			HttpRequest httpRequest;
-			while ((httpRequest = getHttpRequestStructrue(in)) != null) {
+			while ((httpRequest = in.readHttpRequestStructrue()) != null) {
 				url = httpRequest.url;
+				httpRequest.print();
 				// TODO do something with the httpRequest. Put 'X-forward...', for example.
 
 				// TODO do URLFilter
@@ -67,10 +69,13 @@ public class SocketDealer implements Runnable {
 				doResponse(httpRequest, in, out);
 			}
 
+		} catch (SocketException e) {
 		} catch (IOException e) {
 			e.printStackTrace();
-		} catch (IndexOutOfBoundsException e1) {
-			e1.printStackTrace();
+		} catch (IndexOutOfBoundsException e) {
+			e.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		} finally {
 			System.out.println(url + " -线程结束...");
 			try {
@@ -89,77 +94,13 @@ public class SocketDealer implements Runnable {
 	}
 
 	/**
-	 * 返回HttpRequest结构, 不符合协议标准将会抛出异常
-	 * 
-	 * @param reader return
-	 * @throws IOException
-	 */
-	private HttpRequest getHttpRequestStructrue(BufferedInputStream in)
-			throws NullPointerException, IOException, IndexOutOfBoundsException {
-		// refresh the monitor
-		monitor.put(socketClient);
-		// System.out.println("Headers 提取中... 可能会阻塞或抛出异常...");
-		HttpRequest httpRequest = new HttpRequest();
-
-		// 第一行
-		String firstLine = streamReader.readLineFromInputStream(byteBuffer, in);
-		System.out.println(firstLine);
-		String firstLines[] = firstLine.split(" ");
-		httpRequest.method = firstLines[0];
-		httpRequest.url = firstLines[1];
-		httpRequest.version = firstLines[2];
-		// 第一行结束
-
-		// 获取其他属性
-		String key_value = streamReader.readLineFromInputStream(byteBuffer, in);
-		while (key_value != null && key_value.length() > 0) {
-			// System.out.println(key_value);
-			// System.out.println("获取数据中...");
-			String[] objs = key_value.split(":");
-			objs[0] = objs[0].toLowerCase().trim();
-			objs[1] = objs[1].trim();
-			// 获取目的host
-			if (objs[0].toLowerCase().startsWith("host")) {
-				httpRequest.host = objs[1];
-			}
-			// 判断是否有数据
-			if (objs[0].toLowerCase().startsWith("content-length")) {
-				httpRequest.dataLength = Integer.parseInt(objs[1]);
-			}
-			httpRequest.headers.put(objs[0], objs[1]);
-			key_value = streamReader.readLineFromInputStream(byteBuffer, in);
-		}
-		// System.out.println("获取data数据中...");
-		// 获取post数据
-		if (httpRequest.dataLength > 0) {
-			httpRequest.data = new byte[httpRequest.dataLength];
-			int pos = byteBuffer.position();
-			if (httpRequest.dataLength > pos + 1) {
-				System.arraycopy(byteBuffer.array(), 0, httpRequest.data, 0, pos + 1);
-				in.read(httpRequest.data, pos + 1,
-						httpRequest.dataLength - pos - 1);
-			} else {
-				System.arraycopy(byteBuffer.array(), 0, httpRequest.data, 0, httpRequest.dataLength);
-				byteBuffer.position(0);
-				byteBuffer.put(byteBuffer.array(), httpRequest.dataLength, pos - httpRequest.dataLength + 1);
-			}
-
-		}
-		// System.out.println("获取httpRequest完毕...");
-
-		// 内容传输不计入时间, 则从监控队列删除
-		// monitor.remove(socketClient);
-		return httpRequest;
-	}
-
-	/**
 	 * 根据请求返回
 	 * 
 	 * @param httpRequest
 	 * @param reader
 	 * @param writer
 	 */
-	private void doResponse(HttpRequest httpRequest, BufferedInputStream in, BufferedOutputStream out)
+	private void doResponse(HttpRequest httpRequest, StreamReader in, BufferedOutputStream out)
 			throws IOException {
 		httpRequest.print();
 		HttpResponse httpResponse = new HttpResponse();
@@ -221,6 +162,7 @@ public class SocketDealer implements Runnable {
 		// 去掉锚# 和参数? , 获取path
 		String path = httpRequest.url;
 		Matcher matcher = patternURL.matcher(path);
+		//System.out.println("path路径" +httpRequest.url);
 		if (matcher.find()) {
 			path = matcher.group(1);
 		} else {
@@ -442,7 +384,7 @@ public class SocketDealer implements Runnable {
 				} catch (Exception e) {
 				}
 				if (begin > 0) {
-					System.out.println("206");
+					//System.out.println("206");
 					httpResponse.do206();
 				}
 				headerTrans.transferCommonHeader(httpResponse, out);
