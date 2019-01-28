@@ -1,7 +1,7 @@
 package nicelee.http.core.transfer;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.BufferedOutputStream;
 import java.util.Date;
 import java.util.Map.Entry;
 
@@ -44,7 +44,7 @@ public class HttpHeaderTransfer {
 	 * @param writer
 	 * @throws IOException
 	 */
-	public void transferCommonHeader(HttpResponse httpResponse, OutputStream out) throws IOException {
+	public void transferCommonHeader(HttpResponse httpResponse, BufferedOutputStream out) throws IOException {
 		httpResponse.date = new Date().toGMTString();
 		httpResponse.print();
 		//System.out.println("doResponse start~");
@@ -64,5 +64,6 @@ public class HttpHeaderTransfer {
 			out.write((entry.getKey() + ": " + entry.getValue()).getBytes());
 			out.write(BREAK_LINE);
 		}
+		out.flush();
 	}
 }

@@ -16,8 +16,8 @@ public class A0_PrintTCPContentServer {
 		Socket socket = null;
 		System.out.println("服务器监听开始... ");
 		try {
-			serverSocket = new ServerSocket(666);
-			while (true) {
+			serverSocket = new ServerSocket(7778);
+			if (true) {
 				socket = serverSocket.accept();
 				System.out.println("收到新连接: " + socket.getInetAddress() + ":" + socket.getPort());
 				BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -25,6 +25,7 @@ public class A0_PrintTCPContentServer {
 				
 				String data;
 				while( (data = reader.readLine() ) != null ) {
+					System.out.println("收到数据: ");
 					System.out.println(data);
 					if(data.length() == 0)
 						break;

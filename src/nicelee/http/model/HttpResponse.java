@@ -49,7 +49,6 @@ public class HttpResponse {
 	public HashMap<String, String> headers = new HashMap<String, String>();
 	
 	public int dataLength = 0;
-	public char[] data;
 	
 	public HttpResponse do200() {
 		return this;

@@ -1,8 +1,8 @@
 package nicelee.http.core.transfer;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 
 public class HttpDataTransfer {
@@ -23,7 +23,7 @@ public class HttpDataTransfer {
 	 * @param file  文件
 	 * @throws IOException
 	 */
-	public void transferFileWithRange(long begin, long end, OutputStream out, File file) throws IOException {
+	public void transferFileWithRange(long begin, long end, BufferedOutputStream out, File file) throws IOException {
 
 		RandomAccessFile raf = new RandomAccessFile(file, "r");
 		try {
@@ -73,7 +73,7 @@ public class HttpDataTransfer {
 	 * @param file 文件
 	 * @throws IOException
 	 */
-	public void transferFileCommon(OutputStream out, File file) throws IOException {
+	public void transferFileCommon(BufferedOutputStream out, File file) throws IOException {
 		// System.out.println("Transfering file...");
 		RandomAccessFile raf = new RandomAccessFile(file, "r");
 		try {
@@ -90,6 +90,7 @@ public class HttpDataTransfer {
 				sizeRead = raf.read(data);
 			}
 			out.write(BREAK_LINE);
+			out.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
 			throw e;
@@ -108,9 +109,10 @@ public class HttpDataTransfer {
 	 * @param file 文件
 	 * @throws IOException
 	 */
-	public void transferFileChunked(OutputStream out, File file) throws IOException {
+	public void transferFileChunked(BufferedOutputStream out, File file) throws IOException {
 		RandomAccessFile raf = new RandomAccessFile(file, "r");
 		try {
+			System.out.println("准备传输 + ");
 			out.write("Transfer-Encoding: chunked".getBytes());
 			out.write(BREAK_LINE);
 			out.write(BREAK_LINE);
@@ -123,12 +125,15 @@ public class HttpDataTransfer {
 				out.write(data, 0, sizeRead);
 				out.write(BREAK_LINE);
 				sizeRead = raf.read(data);
+				out.flush();
 			}
 			out.write(48);
 			out.write(BREAK_LINE);
 			out.write(BREAK_LINE);
 			out.write(BREAK_LINE);
+			out.flush();
 		} catch (IOException e) {
+			e.printStackTrace();
 			throw e;
 		} finally {
 			try {

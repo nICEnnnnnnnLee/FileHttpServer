@@ -23,7 +23,7 @@ public class HttpRequest {
 	public HashMap<String, String> headers = new HashMap<>();
 	
 	public int dataLength = 0;
-	public char[] data = null;
+	public byte[] data = null;
 	
 	public void print() {
 		System.out.println(method + " "+ url + " " + version);
