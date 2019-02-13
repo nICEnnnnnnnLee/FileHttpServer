@@ -1,4 +1,4 @@
-package nicelee.http.core.transfer;
+package nicelee.http.core.file.transfer;
 
 import java.io.BufferedOutputStream;
 import java.io.File;

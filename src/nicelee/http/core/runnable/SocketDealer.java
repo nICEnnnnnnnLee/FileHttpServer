@@ -3,53 +3,52 @@ package nicelee.http.core.runnable;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
-import java.text.SimpleDateFormat;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import nicelee.http.core.transfer.HttpDataTransfer;
-import nicelee.http.core.transfer.HttpHeaderTransfer;
-import nicelee.http.core.transfer.util.StreamReader;
+import nicelee.config.model.Config;
+import nicelee.http.core.SocketServer;
+import nicelee.http.core.file.transfer.common.CommonResponse;
 import nicelee.http.model.HttpRequest;
-import nicelee.http.model.HttpResponse;
+import nicelee.http.resource.HttpResource;
+import nicelee.http.util.StreamReader;
 
 public class SocketDealer implements Runnable {
-	final static Pattern patternFileRange = Pattern.compile("^bytes=([0-9]+)-([0-9]*)$");
-	final static Pattern patternURL = Pattern.compile("^/([^?^#]*)#?[^#]*\\??[^?^#]*$");
-	final static Pattern patternParent = Pattern.compile("^(/.*)/[^/]+/$|^(/)[^/]+/$");
-	final static Pattern patternSessionid = Pattern
-			.compile("jsessionid *[=|:]{1} *YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo");
-	final static SimpleDateFormat aDateFormat = new SimpleDateFormat("yyyy/MM/dd  HH:mm:ss");
-	final static byte[] BREAK_LINE = "\r\n".getBytes();
-	final static byte[] PAGE_401 = "<html><head><title>Error</title></head><body><center><h1>401 Authorization Required</h1></center><hr><center>Copyright @Nicelee.top</center></body></html>"
-			.getBytes();
-	final static byte[] PAGE_403 = "<html><head><title>Error</title></head><body><center><h1>403 Forbidden</h1></center><hr><center>Copyright @Nicelee.top</center></body></html>"
-			.getBytes();
-	final static byte[] PAGE_404 = "<html><head><title>Error</title></head><body><center><h1>404 Not Found</h1></center><hr><center>Copyright @Nicelee.top</center></body></html>"
-			.getBytes();
-	final static char[] WHITE_SPACE = "                                                ".toCharArray();
+
 	Socket socketClient;
-	File srcFolder;
-	SocketMonitor monitor;
+	Socket socketServer;
+
+	// 与客户端之间的联系
 	StreamReader in;
+	BufferedOutputStream out;
+	// 与服务器之间的联系
+	StreamReader inFromSever;
+	BufferedOutputStream outToServer;
+	// Socket监视器
+	SocketMonitor monitor;
 
+	File srcFolder;
+	int mode;
+	int status = HttpResource.HTTP_REQUEST_FIRST;
 
-	public SocketDealer(Socket socketClient, SocketMonitor monitor, String source) {
+	public SocketDealer(Socket socketClient, SocketMonitor monitor) {
+		this.socketClient = socketClient;
+		this.monitor = monitor;
+	}
+
+	public SocketDealer(Socket socketClient, SocketMonitor monitor, String source, int mode) {
 		this.socketClient = socketClient;
 		this.srcFolder = new File(source);
 		this.monitor = monitor;
-		
+		this.mode = mode;
 	}
 
 	@Override
 	public void run() {
-		//BufferedInputStream in = null;
-		BufferedOutputStream out = null;
 		String url = "";
 		try {
 //			in = new BufferedInputStream(socketClient.getInputStream());
@@ -61,19 +60,39 @@ public class SocketDealer implements Runnable {
 			while ((httpRequest = in.readHttpRequestStructrue()) != null) {
 				url = httpRequest.url;
 				httpRequest.print();
-				// TODO do something with the httpRequest. Put 'X-forward...', for example.
-
-				// TODO do URLFilter
-
-				// TODO give the client a response, proxy or http
-				doResponse(httpRequest, in, out);
+				
+				if(mode == Config.MODE_FILE_HTTP_SERVER) {
+					CommonResponse.doResponseCommon(srcFolder, httpRequest, in, out);
+					
+				}else {
+					if (httpRequest.method.toLowerCase().equals("connect")) {
+						// System.out.println("调用的是connect 方法");
+						doProxyConnect(httpRequest);
+						break;
+					} else {
+						// System.out.println("调用的是普通GET/POST 方法");
+						doProxyNormal(httpRequest);
+					}
+				}
+			}
+			
+			if(mode == Config.MODE_PROXY_HTTP_SERVER) {
+				
+				// 直接转发TCP包, 不做任何处理
+				// System.out.println("当前开始转发TCP包: ");
+				while (true) {
+					int length = in.read(in.readBuffer);
+					// System.out.println("当前收到客户端包大小: " + length);
+					outToServer.write(in.readBuffer, 0, length);
+					outToServer.flush();
+				}
 			}
 
 		} catch (SocketException e) {
+			// e.printStackTrace();
 		} catch (IOException e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 		} catch (IndexOutOfBoundsException e) {
-			e.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
@@ -90,314 +109,145 @@ public class SocketDealer implements Runnable {
 				socketClient.close();
 			} catch (Exception e) {
 			}
+			try {
+				inFromSever.close();
+			} catch (Exception e) {
+			}
+			try {
+				outToServer.close();
+			} catch (Exception e) {
+			}
+			try {
+				socketServer.close();
+			} catch (Exception e) {
+			}
 		}
 	}
 
 	/**
-	 * 根据请求返回
-	 * 
 	 * @param httpRequest
-	 * @param reader
-	 * @param writer
+	 * @throws IOException
 	 */
-	private void doResponse(HttpRequest httpRequest, StreamReader in, BufferedOutputStream out)
-			throws IOException {
+	private void doProxyConnect(HttpRequest httpRequest) throws IOException {
+		// System.out.println("调用的是connect 方法");
+		connecToServer(httpRequest);
+		out.write("HTTP/1.1 200 Connection Established\r\n\r\n".getBytes());
+		out.flush();
+	}
+
+	/**
+	 * @param httpRequest
+	 * @throws IOException
+	 */
+	private void doProxyNormal(HttpRequest httpRequest) throws IOException {
+		// TODO do something with the httpRequest. Put 'X-forward...', for example.
+		httpRequest.headers.put("X-Forwarded-For", "123.123.123.123");
+		// TODO do URLFilter
+
+		// TODO give the client a response, proxy or http
+		// CommonResponse.doResponseCommon(srcFolder, httpRequest, in, out);
+
+		connecToServer(httpRequest);
+		// 向服务器发送Http请求
+		// System.out.println("发送Http请求... ");
+		outToServer.write(
+				String.format("%s %s %s\r\n", httpRequest.method, httpRequest.url, httpRequest.version).getBytes());
+		outToServer.flush();
+		outToServer.write(String.format("Host: %s\r\n", httpRequest.host).getBytes());
+		for (Entry<String, String> entry : httpRequest.headers.entrySet()) {
+			// TODO do some filter or change
+			if (!entry.getKey().toLowerCase().contains("proxy") && !entry.getKey().toLowerCase().contains("forward")
+					&& !entry.getKey().toLowerCase().contains("authorization")) {
+				outToServer.write((entry.getKey() + ": " + entry.getValue()).getBytes());
+				outToServer.write(HttpResource.BREAK_LINE);
+			}
+		}
 		httpRequest.print();
-		HttpResponse httpResponse = new HttpResponse();
-		// 盘点是否禁止访问/未授权访问
-		/**
-		 * 未授权检验 这里以admin:admin为例, 固定生成jsessionid=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo
-		 * 路径为/source
-		 */
-		if (httpRequest.url.startsWith("/source")) {
-			// System.out.println("访问权限目录...");
-			// 如果jsessionid正确, 跳过认证
-			// boolean sessionCorrect = false;
-			String cookies = httpRequest.headers.get("cookie");
-			if (cookies == null || !patternSessionid.matcher(cookies).find()) {
-				// System.out.println("未找到匹配session");
-				String auth = httpRequest.headers.get("authorization");
-				httpRequest.print();
-				// 这里用contains不对, 仅作示范用, 表示鉴权通过
-				if (auth != null && auth.contains("YWRtaW46YWRtaW4")) {
-					// System.out.println("未找到匹配session,但是鉴权通过");
-					httpRequest.headers.put("Set-cookie",
-							"jsessionid=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo;path=/;httponly");
-				} else {
-					// System.out.println("未找到匹配session,且鉴权未通过");
-					doResponseWithFileNotAuth(httpResponse, out);
-					return;
-				}
-				// System.out.println("存在匹配session");
+		if (httpRequest.dataLength > 0) {
+
+			outToServer.write(String.format("Content-Length: %d\r\n", httpRequest.dataLength).getBytes());
+		}
+		outToServer.write(HttpResource.BREAK_LINE);
+		outToServer.flush();
+		if (httpRequest.dataLength > 0) {
+			int count = 0;
+			int rSize = in.read(in.readBuffer);
+			System.out.println(new String(in.readBuffer, 0, rSize));
+			while (rSize < httpRequest.dataLength - count) {
+				outToServer.write(in.readBuffer, 0, rSize);
+				rSize = in.read(in.readBuffer);
+				count += rSize;
 			}
+			outToServer.write(in.readBuffer, 0, httpRequest.dataLength - count);
 		}
-		/**
-		 * 禁止访问检验 路径为*.txt
-		 */
-		if (httpRequest.url.endsWith(".txt")) {
-			doResponseWithFileForbidden(httpResponse, out);
-			return;
-		}
-		if (isPathExists(httpRequest)) {
-			// System.out.println("URL Resouce is at: " + httpRequest.url);
-			File file = new File(srcFolder, httpRequest.url);
-			if (file.isDirectory()) {
-				doResponseWithFolderOK(file, httpRequest, httpResponse, out);
-			} else {
-				doResponseWithFileOK(file, httpRequest, httpResponse, out);
-			}
-		} else {
-			doResponseWithFileNotFound(httpResponse, out);
-		}
+		outToServer.flush();
+		// System.out.println("数据发送完毕...");
 	}
 
 	/**
-	 * 若返回true, 则httpRequest.url已经做了修改,且已经变成了绝对路径
-	 * 
 	 * @param httpRequest
-	 * @return
 	 * @throws IOException
 	 */
-	boolean isPathExists(HttpRequest httpRequest) throws IOException {
-		// 去掉锚# 和参数? , 获取path
-		String path = httpRequest.url;
-		Matcher matcher = patternURL.matcher(path);
-		//System.out.println("path路径" +httpRequest.url);
+	private void connecToServer(HttpRequest httpRequest) throws IOException {
+		String dstIp = httpRequest.host;
+		int dstPort = 80;
+		// connect方法, 从首行url获取参数
+		if (httpRequest.method.toLowerCase().equals("connect")) {
+			dstPort = 443;
+			dstIp = httpRequest.url;
+		}
+		// 获取目的Host
+		Matcher matcher = HttpResource.patternHost.matcher(dstIp);
 		if (matcher.find()) {
-			path = matcher.group(1);
-		} else {
-			System.out.println("path路径不匹配");
-			return false;
+			dstIp = matcher.group(1);
+			dstPort = Integer.parseInt(matcher.group(2));
 		}
+		System.out.print("Host为:");
+		System.out.print(dstIp);
+		System.out.print(" ;ip为:");
+		System.out.println(dstPort);
+		if (socketServer == null) {
+			socketServer = new Socket();
+			socketServer.connect(new InetSocketAddress(dstIp, dstPort));
+//					 socketServer.connect(new InetSocketAddress("127.0.0.1", 7778));
 
-		/**
-		 * 优先顺序, 0. 文件存在 1. 不做任何修饰, 文件存在 2. 文件夹下, index.html/index.htm存在 3.
-		 * path加上.html后缀,文件存在
-		 */
-		File file = new File(srcFolder, path);
-		if (file.exists() && file.isDirectory()) {
-			return true;
+			// 获取服务器之间的输入输出流
+			inFromSever = new StreamReader(monitor, socketServer,
+					new BufferedInputStream(socketServer.getInputStream()));
+			outToServer = new BufferedOutputStream(socketServer.getOutputStream());
+
+			// 打开面向服务器的监听线程,专用于转发数据给客户端
+			ProxyDealer proxyDealer = new ProxyDealer(this);
+			SocketServer.httpProxyThreadPool.execute(proxyDealer);
 		}
-		if (file.exists()) {
-			// 匹配 1.
-			if (file.isFile()) {
-				return true;
-			}
-		} else {
-			// 匹配 3.
-			String[] suffixs = { ".html", ".htm" };
-			for (String suffix : suffixs) {
-				File filDst = new File(file.getParent(), file.getName() + suffix);
-				if (filDst.exists()) {
-					httpRequest.url += suffix;
-					return true;
-				}
-			}
-		}
-		return false;
 	}
 
-	/**
-	 * 若URL对应的文件不允许访问, 使用该方法返回
-	 * 
-	 * @param httpResponse
-	 * @param writer
-	 * @throws IOException
-	 */
-	private void doResponseWithFileForbidden(HttpResponse httpResponse, BufferedOutputStream out) throws IOException {
-		HttpHeaderTransfer headerTrans = new HttpHeaderTransfer();
-
-		// 403
-		httpResponse.do403();
-		httpResponse.dataLength = PAGE_403.length;
-		headerTrans.transferCommonHeader(httpResponse, out);
-
-		// out date-length & data
-		out.write("Content-Length: ".getBytes());
-		out.write(("" + httpResponse.dataLength).getBytes());
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.write(PAGE_403);
-		out.flush();
+	public Socket getSocketClient() {
+		return socketClient;
 	}
 
-	/**
-	 * 若URL对应的文件未经授权认证, 使用该方法返回
-	 * 
-	 * @param httpResponse
-	 * @param writer
-	 * @throws IOException
-	 */
-	private void doResponseWithFileNotAuth(HttpResponse httpResponse, BufferedOutputStream out) throws IOException {
-		HttpHeaderTransfer headerTrans = new HttpHeaderTransfer();
-
-		// 401
-		httpResponse.do401();
-		httpResponse.dataLength = PAGE_401.length;
-		httpResponse.headers.put("WWW-Authenticate", "Basic realm=\"NiceLee's Site\"");
-		headerTrans.transferCommonHeader(httpResponse, out);
-
-		// out date-length & data
-		out.write("Content-Length: ".getBytes());
-		out.write(("" + httpResponse.dataLength).getBytes());
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.write(PAGE_401);
-		out.flush();
+	public Socket getSocketServer() {
+		return socketServer;
 	}
 
-	/**
-	 * 若URL对应的文件不存在, 使用该方法返回
-	 * 
-	 * @param httpResponse
-	 * @param writer
-	 * @throws IOException
-	 */
-	private void doResponseWithFileNotFound(HttpResponse httpResponse, BufferedOutputStream out) throws IOException {
-		HttpHeaderTransfer headerTrans = new HttpHeaderTransfer();
-
-		// 404
-		httpResponse.do404();
-		httpResponse.dataLength = PAGE_404.length;
-		headerTrans.transferCommonHeader(httpResponse, out);
-
-		// out date-length & data
-		out.write("Content-Length: ".getBytes());
-		out.write(("" + httpResponse.dataLength).getBytes());
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.write(PAGE_404);
-		out.flush();
+	public StreamReader getIn() {
+		return in;
 	}
 
-	/**
-	 * 若文件夹解析成功, 按此返回目录
-	 * 
-	 * @param fileFolder
-	 * @param httpRequest
-	 * @param httpResponse
-	 * @param out
-	 * @throws IOException
-	 */
-	public void doResponseWithFolderOK(File fileFolder, HttpRequest httpRequest, HttpResponse httpResponse,
-			BufferedOutputStream out) throws IOException {
-		if (!httpRequest.url.endsWith("/")) {
-			httpRequest.url += "/";
-		}
-		// 200
-		HttpHeaderTransfer headerTrans = new HttpHeaderTransfer();
-		httpResponse.do200();
-		headerTrans.transferCommonHeader(httpResponse, out);
-
-		// out date-length & data
-		out.write("Transfer-Encoding: chunked".getBytes());
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.flush();
-
-		byte[] head = ("<html><head><meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8;\"/><title>Nicelee.top提供</title></head><body>")
-				.getBytes();
-		out.write(String.format("%x", head.length).getBytes());
-		out.write(BREAK_LINE);
-		out.write(head);
-		out.write(BREAK_LINE);
-
-		// System.out.println("当前url 为: " +httpRequest.url);
-		byte[] title = String.format("<h1>Index Of %s</h1><hr><pre>", httpRequest.url).getBytes();
-		out.write(String.format("%x", title.length).getBytes());
-		out.write(BREAK_LINE);
-		out.write(title);
-		out.write(BREAK_LINE);
-
-		StringBuilder sb = new StringBuilder();
-		// 列出父级目录
-		Matcher matcher = patternParent.matcher(httpRequest.url);
-		if (matcher.find()) {
-			String parent = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
-			sb.append("<a href=\"").append(parent).append("\">../</a><br>");
-
-		}
-		// 列出文件夹
-		for (File childFolder : fileFolder.listFiles()) {
-			if (childFolder.isDirectory()) {
-				sb.append("<a href=\"").append(httpRequest.url + childFolder.getName()).append("\">")
-						.append(childFolder.getName()).append("/</a><br>");
-
-			}
-		}
-		// 列出文件
-		for (File childFile : fileFolder.listFiles()) {
-			if (childFile.isFile()) {
-				String fSize = String.valueOf(childFile.length());
-				sb.append("<a href=\"").append(httpRequest.url + childFile.getName()).append("\">")
-						.append(childFile.getName()).append("</a>")
-						.append(WHITE_SPACE, 0, WHITE_SPACE.length - childFile.getName().length())
-						.append(aDateFormat.format(childFile.lastModified()))
-						.append(WHITE_SPACE, 0, WHITE_SPACE.length - fSize.length() - 30).append(fSize).append("<br>");
-			}
-		}
-		sb.append("</pre><hr></body></html>");
-		out.write(String.format("%x", sb.length()).getBytes());
-		out.write(BREAK_LINE);
-		out.write(sb.toString().getBytes());
-		out.write(BREAK_LINE);
-
-		out.write(48);
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.write(BREAK_LINE);
-		out.flush();
+	public BufferedOutputStream getOut() {
+		return out;
 	}
 
-	/**
-	 * 若URL对应的文件存在, 使用该方法返回
-	 * 
-	 * @param file
-	 * @param httpResponse
-	 * @param writer
-	 * @throws FileNotFoundException
-	 * @throws UnsupportedEncodingException
-	 * @throws IOException
-	 */
-	private void doResponseWithFileOK(File file, HttpRequest httpRequest, HttpResponse httpResponse,
-			BufferedOutputStream out) throws FileNotFoundException, UnsupportedEncodingException, IOException {
-		httpResponse.do200();
-		httpResponse.dataLength = (int) file.length();
-		HttpHeaderTransfer headerTrans = new HttpHeaderTransfer();
+	public StreamReader getInFromSever() {
+		return inFromSever;
+	}
 
-		String fName = file.getName().toLowerCase();
-		headerTrans.setContentType(httpResponse, fName);
+	public BufferedOutputStream getOutToServer() {
+		return outToServer;
+	}
 
-		// out date-length & data
-		HttpDataTransfer dataTrans = new HttpDataTransfer();
-		// decide file begin and end if range acquired
-		String range;
-		if ((range = httpRequest.headers.get("range")) != null) {
-			// System.out.println("Range Required: " +range);
-			Matcher matcher = patternFileRange.matcher(range);
-			if (matcher.find()) {
-				long begin = Long.parseLong(matcher.group(1));
-				long end = file.length() - 1;
-				try {
-					end = Long.parseLong(matcher.group(2));
-					end = end < (file.length() - 1) ? end : (file.length() - 1);
-				} catch (Exception e) {
-				}
-				if (begin > 0) {
-					//System.out.println("206");
-					httpResponse.do206();
-				}
-				headerTrans.transferCommonHeader(httpResponse, out);
-				dataTrans.transferFileWithRange(begin, end, out, file);
-			} else {
-				headerTrans.transferCommonHeader(httpResponse, out);
-				dataTrans.transferFileCommon(out, file);
-			}
-		} else {
-			headerTrans.transferCommonHeader(httpResponse, out);
-			dataTrans.transferFileCommon(out, file);
-		}
-		out.flush();
+	public SocketMonitor getMonitor() {
+		return monitor;
 	}
 
 }

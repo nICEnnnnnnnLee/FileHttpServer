@@ -1,13 +1,15 @@
 package nicelee.http.sample;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Date;
+
+import nicelee.http.core.runnable.SocketMonitor;
+import nicelee.http.resource.HttpResource;
+import nicelee.http.util.StreamReader;
 
 public class A0_PrintTCPContentServer {
 
@@ -20,12 +22,13 @@ public class A0_PrintTCPContentServer {
 			if (true) {
 				socket = serverSocket.accept();
 				System.out.println("收到新连接: " + socket.getInetAddress() + ":" + socket.getPort());
-				BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				//BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 				BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 				
+				StreamReader reader = new StreamReader(new SocketMonitor(0), null, new BufferedInputStream(socket.getInputStream()));
 				String data;
 				while( (data = reader.readLine() ) != null ) {
-					System.out.println("收到数据: ");
+					//System.out.println("收到数据: ");
 					System.out.println(data);
 					if(data.length() == 0)
 						break;
@@ -34,7 +37,7 @@ public class A0_PrintTCPContentServer {
 				
 				String html = "<html><head><title>test</title></head><body><h1>测试</h1></body></html>";
 				writer.write("HTTP/1.1 200 OK\r\n");
-				writer.write("Date: "+ new Date().toGMTString());
+				writer.write("Date: "+ HttpResource.GMTDateFormat.format(System.currentTimeMillis()));
 				writer.write("\r\nContent-Type: text/html; charset=UTF-8\r\n");
 				writer.write("Content-Length: "+ html.length()+ "\r\n");
 				writer.write("\r\n");
