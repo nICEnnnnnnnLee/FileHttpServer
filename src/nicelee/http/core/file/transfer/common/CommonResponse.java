@@ -33,13 +33,14 @@ public class CommonResponse {
 		 * 路径为/source
 		 */
 		if (httpRequest.url.startsWith("/source")) {
-			// System.out.println("访问权限目录...");
+			//System.out.println("访问权限目录...");
 			// 如果jsessionid正确, 跳过认证
 			// boolean sessionCorrect = false;
 			String cookies = httpRequest.headers.get("cookie");
 			if (cookies == null || !HttpResource.patternSessionid.matcher(cookies).find()) {
 				// System.out.println("未找到匹配session");
 				String auth = httpRequest.headers.get("authorization");
+				System.out.println("存在匹配session" + auth);
 				httpRequest.print();
 				// 这里用contains不对, 仅作示范用, 表示鉴权通过
 				if (auth != null && auth.contains("YWRtaW46YWRtaW4")) {
@@ -51,7 +52,7 @@ public class CommonResponse {
 					CommonResponse.doResponseWithFileNotAuth(httpResponse, out);
 					return;
 				}
-				// System.out.println("存在匹配session");
+				//System.out.println("存在匹配session");
 			}
 		}
 		/**
@@ -196,7 +197,7 @@ public class CommonResponse {
 	}
 
 	/**
-	 * 若URL对应的文件不存在, 使用该方法返回
+	 * 若URL对应的文件缓存未过时, 使用该方法返回
 	 * 
 	 * @param httpResponse
 	 * @param writer

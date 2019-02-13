@@ -150,7 +150,7 @@ public class StreamReader {
 			// System.out.println("获取数据中...");
 			Matcher matcher = HttpResource.patternHeaders.matcher(key_value);
 			matcher.find();
-			String key = matcher.group(1).trim();
+			String key = matcher.group(1).trim().toLowerCase();
 			String value = matcher.group(2).trim();
 			if (key.toLowerCase().startsWith("host")) {
 				// 获取目的host
