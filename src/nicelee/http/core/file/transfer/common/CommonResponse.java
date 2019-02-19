@@ -307,7 +307,7 @@ public class CommonResponse {
 			}
 		}
 		sb.append("</pre><hr></body></html>");
-		out.write(String.format("%x", sb.length()).getBytes());
+		out.write(String.format("%x", sb.toString().getBytes().length).getBytes());
 		out.write(HttpResource.BREAK_LINE);
 		out.write(sb.toString().getBytes());
 		out.write(HttpResource.BREAK_LINE);
