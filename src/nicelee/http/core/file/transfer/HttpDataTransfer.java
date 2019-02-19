@@ -79,8 +79,6 @@ public class HttpDataTransfer {
 		try {
 			long fSize = file.length();
 			// System.out.println("File size: "+ fSize);
-			out.write("Content-Encoding: br".getBytes());
-			out.write(BREAK_LINE);
 			out.write("Content-Length: ".getBytes());
 			out.write(("" + fSize).getBytes());
 			out.write(BREAK_LINE);

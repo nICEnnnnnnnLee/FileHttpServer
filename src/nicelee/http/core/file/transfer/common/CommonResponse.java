@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.util.regex.Matcher;
 
 import nicelee.http.core.file.transfer.HttpDataTransfer;
@@ -25,6 +26,7 @@ public class CommonResponse {
 	 */
 	public static void doResponseCommon(File srcFolder, HttpRequest httpRequest, StreamReader in,
 			BufferedOutputStream out) throws IOException {
+		//httpRequest.url = URLDecoder.decode(httpRequest.url);
 		httpRequest.print();
 		HttpResponse httpResponse = new HttpResponse();
 		// 盘点是否禁止访问/未授权访问

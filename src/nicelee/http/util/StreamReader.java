@@ -4,6 +4,8 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.util.regex.Matcher;
 
@@ -139,7 +141,7 @@ public class StreamReader {
 		//System.out.println("第一行为: " + firstLine);
 		String firstLines[] = firstLine.split(" ");
 		httpRequest.method = firstLines[0];
-		httpRequest.url = firstLines[1];
+		httpRequest.url = URLDecoder.decode(firstLines[1]);
 		httpRequest.version = firstLines[2];
 		// 第一行结束
 

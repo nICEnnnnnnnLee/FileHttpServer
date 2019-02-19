@@ -16,7 +16,7 @@ public class A0_PrintTCPContentClient {
 			System.out.println("开始连接... ");
 			socket=new Socket();
 			socket.bind(new InetSocketAddress(15555));
-			socket.connect(new InetSocketAddress("127.0.0.1", 8889));
+			socket.connect(new InetSocketAddress("127.0.0.1", 7777));
 //			socket.connect(new InetSocketAddress("m.baidu.com", 80));
 //			socket.connect(new InetSocketAddress("nicelee.top", 80));
 			
@@ -26,7 +26,7 @@ public class A0_PrintTCPContentClient {
 			
 //			writer.write("CONNECT wx3.sinaimg.cn:443 HTTP/1.1\r\n");
 //			writer.write("Proxy-Connection: keep-alive\r\n");
-			writer.write("GET / HTTP/1.1\r\n");
+			writer.write("GET /阿里云-SSH登录.lnk HTTP/1.1\r\n");
 			writer.write("Host: nicelee.top\r\n");
 			writer.write("Connection: keep-alive\r\n");
 			//writer.write("content-length: 12\r\n");
